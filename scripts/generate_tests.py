@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-CRUD Test Generator
+Frontend-Backend Flow Test Generator
 
-Generates Python test scripts from configuration file.
+Generates live API test scripts from configuration file.
 
 Usage:
     python3 generate_tests.py --config <config.json> [--output <dir>]
@@ -18,7 +18,7 @@ from datetime import datetime
 
 TEST_TEMPLATE = '''#!/usr/bin/env python3
 """
-Auto-generated CRUD Test: {feature_name}
+Auto-generated Flow Test: {feature_name}
 Generated: {timestamp}
 Service: {service_name}
 """
@@ -41,14 +41,29 @@ class {class_name}Test:
         """Login and get authentication token"""
         print("🔐 Logging in...")
         
-        r = requests.post(
-            f"{{API_BASE}}{login_endpoint}",
-            data={{
-                'email': '{email}',
-                'password': '{password}'
-            }},
-            timeout=10
-        )
+        login_payload = {
+            'email': '{email}',
+            'password': '{password}'
+        }
+
+        if "{login_request_encoding}" == "json":
+            r = requests.post(
+                f"{{API_BASE}}{login_endpoint}",
+                json=login_payload,
+                timeout=10
+            )
+        elif "{login_request_encoding}" == "params":
+            r = requests.post(
+                f"{{API_BASE}}{login_endpoint}",
+                params=login_payload,
+                timeout=10
+            )
+        else:
+            r = requests.post(
+                f"{{API_BASE}}{login_endpoint}",
+                data=login_payload,
+                timeout=10
+            )
         
         if r.status_code == 200:
             data = r.json()
@@ -70,16 +85,29 @@ class {class_name}Test:
         
         try:
             data = {create_data}
-            data.update({{
-                'userId': self.user_id
-            }})
-            
-            r = requests.{http_create_method}(
-                f"{{API_BASE}}{create_endpoint}",
-                data=data,
-                headers=self.get_auth_headers(),
-                timeout=10
-            )
+            {create_user_binding}
+
+            if "{create_request_encoding}" == "json":
+                r = requests.{http_create_method}(
+                    f"{{API_BASE}}{create_endpoint}",
+                    json=data,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
+            elif "{create_request_encoding}" == "params":
+                r = requests.{http_create_method}(
+                    f"{{API_BASE}}{create_endpoint}",
+                    params=data,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
+            else:
+                r = requests.{http_create_method}(
+                    f"{{API_BASE}}{create_endpoint}",
+                    data=data,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
             
             if r.status_code in [200, 201]:
                 result = r.json()
@@ -106,13 +134,30 @@ class {class_name}Test:
         
         try:
             endpoint = "{delete_endpoint}".format(id=self.resource_id)
-            
-            r = requests.{http_delete_method}(
-                f"{{API_BASE}}{{endpoint}}",
-                data={{'userId': self.user_id, {delete_id_param}}},
-                headers=self.get_auth_headers(),
-                timeout=10
-            )
+            payload = {{{delete_id_param}}}
+            {delete_user_binding}
+
+            if "{delete_request_encoding}" == "json":
+                r = requests.{http_delete_method}(
+                    f"{{API_BASE}}{{endpoint}}",
+                    json=payload,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
+            elif "{delete_request_encoding}" == "params":
+                r = requests.{http_delete_method}(
+                    f"{{API_BASE}}{{endpoint}}",
+                    params=payload,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
+            else:
+                r = requests.{http_delete_method}(
+                    f"{{API_BASE}}{{endpoint}}",
+                    data=payload,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
             
             if r.status_code in [200, 204]:
                 print(f"  ✅ DELETE success (rollback complete)")
@@ -128,7 +173,7 @@ class {class_name}Test:
     def run(self):
         """Run full test suite"""
         print("="*70)
-        print("🧪 CRUD Test: {feature_name}")
+        print("🧪 Flow Test: {feature_name}")
         print("="*70)
         print(f"Time: {{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}}")
         print()
@@ -193,17 +238,32 @@ UPDATE_METHOD_TEMPLATE = '''
         try:
             endpoint = "{update_endpoint}".format(id=self.resource_id)
             data = {update_data}
+            {update_user_binding}
             data.update({{
-                'userId': self.user_id,
                 {update_id_param}
             }})
-            
-            r = requests.{http_method}(
-                f"{{API_BASE}}{{endpoint}}",
-                data=data,
-                headers=self.get_auth_headers(),
-                timeout=10
-            )
+
+            if "{update_request_encoding}" == "json":
+                r = requests.{http_method}(
+                    f"{{API_BASE}}{{endpoint}}",
+                    json=data,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
+            elif "{update_request_encoding}" == "params":
+                r = requests.{http_method}(
+                    f"{{API_BASE}}{{endpoint}}",
+                    params=data,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
+            else:
+                r = requests.{http_method}(
+                    f"{{API_BASE}}{{endpoint}}",
+                    data=data,
+                    headers=self.get_auth_headers(),
+                    timeout=10
+                )
             
             if r.status_code in [200, 201]:
                 print(f"  ✅ UPDATE success")
@@ -251,6 +311,12 @@ def generate_auth_headers(auth_config):
     else:
         return "return {}"
 
+def build_user_binding(include_user_id, field_name='userId', target='data'):
+    if include_user_id:
+        return f"{target}['{field_name}'] = self.user_id"
+    return ""
+
+
 def generate_test(config, feature_key, feature_config, output_dir):
     """Generate test file for a feature"""
     
@@ -265,7 +331,8 @@ def generate_test(config, feature_key, feature_config, output_dir):
     
     token_path = test_account.get('token_path', 'token')
     user_id_path = test_account.get('user_id_path', 'user_id')
-    
+    login_request_encoding = test_account.get('request_encoding', 'data')
+
     token_extraction = f"self.token = str({extract_json_path(token_path)})"
     user_id_extraction = f"self.user_id = {extract_json_path(user_id_path)}"
     
@@ -273,6 +340,9 @@ def generate_test(config, feature_key, feature_config, output_dir):
     create_config = feature_config.get('create', {})
     create_endpoint = create_config.get('endpoint', f'/{feature_key}')
     create_method = create_config.get('method', 'POST')
+    create_request_encoding = create_config.get('request_encoding', 'data')
+    create_include_user_id = create_config.get('include_user_id', False)
+    create_user_id_field = create_config.get('user_id_field', 'userId')
     id_field = create_config.get('id_field', 'id')
     test_data = create_config.get('test_data', {})
     
@@ -324,14 +394,19 @@ def generate_test(config, feature_key, feature_config, output_dir):
         update_config = feature_config['update']
         update_endpoint = update_config.get('endpoint', f'/{feature_key}/{{id}}')
         update_method = update_config.get('method', 'PUT')
+        update_request_encoding = update_config.get('request_encoding', 'data')
+        update_include_user_id = update_config.get('include_user_id', False)
+        update_user_id_field = update_config.get('user_id_field', 'userId')
         update_data = test_data.copy()
         update_data['content'] = f'[AutoTest] Updated {feature_name}'
-        
+
         update_id_param = f"'{feature_key}_id': self.resource_id"
         
         update_method_code = UPDATE_METHOD_TEMPLATE.format(
             feature_name=feature_name,
             update_endpoint=update_endpoint,
+            update_request_encoding=update_request_encoding,
+            update_user_binding=build_user_binding(update_include_user_id, update_user_id_field),
             http_method=update_method.lower(),
             update_data=json.dumps(update_data),
             update_id_param=update_id_param
@@ -347,6 +422,9 @@ def generate_test(config, feature_key, feature_config, output_dir):
     delete_config = feature_config.get('delete', {})
     delete_endpoint = delete_config.get('endpoint', f'/{feature_key}/{{id}}')
     delete_method = delete_config.get('method', 'DELETE')
+    delete_request_encoding = delete_config.get('request_encoding', 'data')
+    delete_include_user_id = delete_config.get('include_user_id', False)
+    delete_user_id_field = delete_config.get('user_id_field', 'userId')
     delete_id_param = f"'{feature_key}_id': self.resource_id"
     
     test_sequence = read_test + update_test
@@ -360,6 +438,7 @@ def generate_test(config, feature_key, feature_config, output_dir):
         auth_method=auth_config.get('method', 'header'),
         class_name=class_name,
         login_endpoint=test_account.get('login_endpoint', '/login'),
+        login_request_encoding=login_request_encoding,
         email=test_account.get('email', 'test@example.com'),
         password=test_account.get('password', 'password'),
         token_extraction=token_extraction,
@@ -367,11 +446,15 @@ def generate_test(config, feature_key, feature_config, output_dir):
         auth_headers=generate_auth_headers(auth_config),
         http_create_method=create_method.lower(),
         create_endpoint=create_endpoint,
+        create_request_encoding=create_request_encoding,
+        create_user_binding=build_user_binding(create_include_user_id, create_user_id_field),
         create_data=json.dumps(test_data),
         id_extraction=id_extraction,
         read_method=read_method_code,
         update_method=update_method_code,
         delete_endpoint=delete_endpoint,
+        delete_request_encoding=delete_request_encoding,
+        delete_user_binding=build_user_binding(delete_include_user_id, delete_user_id_field, 'payload'),
         http_delete_method=delete_method.lower(),
         delete_id_param=delete_id_param,
         test_sequence=test_sequence
@@ -386,7 +469,7 @@ def generate_test(config, feature_key, feature_config, output_dir):
     return output_file
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate CRUD tests from configuration')
+    parser = argparse.ArgumentParser(description='Generate flow-oriented live API tests from configuration')
     parser.add_argument('--config', required=True, help='Configuration file path')
     parser.add_argument('--output', default='.', help='Output directory')
     parser.add_argument('--dry-run', action='store_true', help='Generate tests without write operations')
@@ -435,7 +518,7 @@ def main():
     
     # Generate tests for each feature
     print("="*70)
-    print("🔧 Generating CRUD Tests")
+    print("🔧 Generating Flow Tests")
     print("="*70)
     print(f"Config: {config_path}")
     print(f"Service: {config['service']['name']}")
