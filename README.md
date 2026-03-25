@@ -1,216 +1,141 @@
-# CRUD Test Auto - Skill Quality Report
+# Frontend-Backend Flow Test
 
-## Maturity Level: **Beta (6.5/10)**
-
----
-
-## ✅ What Works Well
-
-### Concept & Design
-- Clear problem definition: automate repetitive CRUD test generation
-- Configuration-driven approach is intuitive
-- Good separation of concerns (config → generate → run)
-- Reusable across multiple services
-- Documentation structure is sound
-
-### User Experience
-- Quick start examples are clear
-- Config format is readable
-- Generated tests are human-readable Python
-- Examples cover common use cases
+## Maturity Level: **Beta (7.0/10)**
 
 ---
 
-## ⚠️ Known Limitations
+## What This Skill Is
 
-### Scope Restrictions
-**Supported:**
-- Simple REST APIs (JSON only)
-- Synchronous operations
-- Header/cookie authentication
-- Single resource CRUD
+Frontend-Backend Flow Test analyzes frontend API usage, compares it with backend contracts, and can optionally run transaction-style live API tests with best-effort cleanup.
 
-**NOT Supported:**
-- GraphQL, WebSocket, gRPC
-- OAuth authentication flows
-- Batch operations
-- File uploads
-- Nested resource dependencies
-- Async/job-based operations
-- Pagination, filtering, search
+This is **not** just a CRUD generator anymore.
+The primary value is:
 
-### Rollback is NOT True Transaction
-
-**What DELETE does:**
-- ✅ Removes resource record
-
-**What DELETE does NOT revert:**
-- ❌ Sent notifications/emails
-- ❌ Awarded points/credits
-- ❌ Triggered webhooks
-- ❌ External integrations
-- ❌ Audit logs
-- ❌ Cache updates
-
-**Recommendation:** Use isolated test environments with disabled side effects.
-
-### Test Quality
-
-**Current validation:**
-- HTTP status codes
-- Resource ID presence
-- Basic CRUD flow completion
-
-**Missing validation:**
-- Response schema
-- Strong field value correctness guarantees
-- Timestamp validation
-- Relationship integrity
-- Permission boundaries
+1. **Contract audit** — verify that frontend request flows match backend endpoint contracts
+2. **Optional live verification** — run selected real-data scenarios in dev/staging
+3. **Best-effort cleanup** — attempt cleanup after write tests, without claiming true rollback
 
 ---
 
-## 🚨 Safety Concerns
+## Core Modes
 
-### Production Risk
+### 1. Audit mode (default)
+Use when you want static verification only.
 
-**DANGER:** This skill can write to production if misconfigured.
+Checks may include:
+- frontend request method/path usage
+- header/auth expectations
+- request payload shape
+- query parameter usage
+- response field usage
+- backend controller / DTO alignment
 
-**Mitigations:**
-1. Environment validation warnings
-2. `--dry-run` flag
-3. `--read-only` flag (future)
-4. Manual confirmation for production-like URLs
+### 2. Live read-only mode
+Use when you want real-environment verification without write operations.
 
-**Best practice:** Only use in dev/staging environments.
+### 3. Live write mode
+Use when you want controlled create/update/delete validation with cleanup attempts.
 
-### Edge Cases
-
-1. **Soft Delete:** Repeated tests may fail due to unique constraints
-2. **Eventual Consistency:** Read-after-write may not find resource
-3. **Dependencies:** Cascade delete failures leave orphaned data
-4. **Token Expiry:** Long tests may fail mid-execution
-5. **ID Extraction:** Complex response structures not supported
-
----
-
-## 📊 Implementation Status
-
-### ✅ Implemented
-- Basic config parsing
-- Template-based test generation
-- Simple auth (header/cookie)
-- CREATE/READ/UPDATE/DELETE operations
-- DELETE-based cleanup
-- Environment warnings
-- Examples and documentation
-
-### 🔄 Partially Implemented
-- ID extraction (simple paths only)
-- Auth headers (basic patterns)
-- Error handling (minimal)
-
-### ❌ Not Implemented
-- Schema validation
-- Field assertions
-- Retry logic
-- Eventual consistency handling
-- Token refresh
-- Dry-run mode (flag exists, not wired)
-- Read-only mode (flag exists, not wired)
-- Cascade delete
-- Dependency resolution
+**Important:** cleanup is best-effort only. Side effects may remain.
 
 ---
 
-## 🎯 Recommended Use Cases
+## Good Fit
 
-### ✅ Good Fit
-- **Smoke testing** new API endpoints
-- **Regression checks** for existing APIs
-- **Local development** rapid iteration
-- **CI/CD sanity checks**
-- **Quick prototyping**
+- Frontend-backend contract validation
+- Regression auditing across web/mobile/admin
+- Controlled dev/staging real-data verification
+- API flow sanity checks before release
+- Detecting request/response drift between frontend and backend
 
-### ❌ Not a Good Fit
-- **Production testing**
-- **Comprehensive QA**
-- **Performance testing**
-- **Security testing**
-- **User acceptance testing**
+## Not a Good Fit
+
+- Production write testing
+- Guaranteed rollback requirements
+- Full browser/app UI automation
+- Comprehensive QA replacement
+- Arbitrary APIs with zero configuration
 
 ---
 
-## 🔮 Improvement Roadmap
+## Strengths
+
+- Clear split between audit mode and live mode
+- Better fit for real frontend-backend integration work
+- Useful for multi-surface products like web/mobile/admin stacks
+- Safer positioning than generic “automatic rollback” tooling
+- Flexible path toward contract reports + live validation
+
+---
+
+## Current Limitations
+
+### Audit limitations
+- Contract extraction still depends on recognizable frontend/backend patterns
+- Dynamic request assembly may be hard to infer automatically
+- Response usage analysis may miss indirect or computed usage
+
+### Live test limitations
+- Cleanup is **not** true transaction rollback
+- Side effects may remain (emails, notifications, webhooks, logs, external integrations)
+- Production-safe write verification is not supported
+- Environment-specific auth and payload rules still need configuration
+
+### Test quality limitations
+- Live checks should be positioned as targeted validation, not full QA coverage
+- Schema validation, richer field assertions, and dependency-aware cleanup may require future expansion
+
+---
+
+## Recommended Roadmap
 
 ### High Priority
-1. **Actually implement --dry-run** (currently just a flag)
-2. **Implement --read-only** mode
-3. **Add config validation** (schema enforcement)
-4. **Better error messages** with debugging hints
-5. **Environment allowlist** (block production)
+1. Add frontend request extraction patterns for Flutter/React-style API layers
+2. Add backend contract extraction patterns for Spring controllers/DTOs
+3. Define contract mismatch report format
+4. Add live-mode configuration schema
+5. Add stronger safety gates for write tests
 
 ### Medium Priority
-6. **Field-level assertions** in generated tests
-7. **Response schema validation**
-8. **Retry logic** for eventual consistency
-9. **Dependency graph** for cleanup order
-10. **Token refresh** support
+6. Add request encoding options (`json`, `data`, `params`, multipart)
+7. Add configurable auth extraction flows
+8. Add field-level assertion options
+9. Add dependency-aware cleanup strategies
+10. Add retry support for eventual consistency
 
 ### Low Priority
-11. Pagination testing
-12. Filtering validation
-13. Batch operations
-14. Performance metrics
-15. HTML test reports
+11. Add reusable report templates
+12. Add surface-specific examples (mobile/web/admin)
+13. Add CI-oriented audit output modes
+14. Add richer environment policy controls
 
 ---
 
-## 📝 Current Version Assessment
+## User Guidance
 
-**Version:** 1.1.0  
-**Status:** Beta / Early Release  
-**Maturity:** 6.5/10
-
-**Strengths:**
-- Solid concept
-- Clear documentation
-- Practical examples
-- Fast to get started
-
-**Weaknesses:**
-- Production safety not enforced (only warned)
-- Test quality is basic (status + ID only)
-- Edge cases not handled
-- Rollback limitations not obvious enough
-
-**Recommended next steps before 1.2.0:**
-1. Wire --dry-run and --read-only flags
-2. Add config schema validator
-3. Improve generated test assertions
-4. Add troubleshooting guide
-5. More defensive environment checks
+Before using this skill:
+1. Decide whether audit mode alone is enough
+2. Use live mode only when real API verification is actually needed
+3. Keep write tests in isolated dev/staging environments
+4. Assume cleanup may be incomplete
+5. Treat reports as contract validation evidence, not production safety guarantees
 
 ---
 
-## 🎓 User Guidance
+## Summary
 
-**Before using this skill:**
+**Use this skill when:**
+- you want to verify whether frontend request flows match backend contracts
+- you want optional live validation with controlled real-data scenarios
+- you need regression auditing across frontend and backend surfaces
 
-1. Read [LIMITATIONS.md](references/LIMITATIONS.md)
-2. Understand rollback is DELETE-only, not true transaction
-3. Only use in dev/staging (never production)
-4. Use isolated test accounts
-5. Expect basic smoke tests, not comprehensive QA
-
-**If you need:**
-- Comprehensive testing → Write manual tests
-- Production safety → Do not use this skill
-- Complex scenarios → Custom test framework
-- Schema validation → Add manually to generated tests
+**Do not use this skill when:**
+- production write safety is required
+- guaranteed rollback is required
+- full E2E automation is expected
 
 ---
 
-**Last updated:** 2026-03-25  
-**Maintainer:** @dlawnsdk  
-**Skill ID:** k9760t1taq053vwy2efkrxae1d83j8pa
+**Version:** 1.2.0  
+**Status:** Beta / Repositioned Scope  
+**Maintainer:** @dlawnsdk

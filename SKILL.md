@@ -1,381 +1,115 @@
 ---
-name: crud-test-auto
-description: Automated CRUD test generation for simple REST APIs (JSON only, synchronous operations). Use when you need quick smoke tests for Create/Read/Update/Delete operations with basic rollback. Generates Python test scripts from config file. Supports header/cookie auth, simple CRUD flows. NOT for: GraphQL, WebSocket, OAuth flows, batch operations, complex nested resources, or production environments. Best for: dev/staging smoke tests, regression checks, rapid prototyping. See LIMITATIONS.md for full scope.
+name: frontend-backend-flow-test
+description: Analyze frontend API usage, compare it with backend contracts, and optionally run transaction-style live API tests with best-effort cleanup. Use when validating whether web/mobile/admin frontend requests are correctly accepted by backend endpoints, DTOs, auth rules, and response shapes. Best for frontend-backend contract validation, regression auditing, and controlled real-data verification in dev/staging environments. NOT for: production write testing, guaranteed rollback, or fully automatic support for arbitrary APIs without configuration.
 ---
 
-# CRUD Test Automation
+# Frontend-Backend Flow Test
 
-Automatically generate basic CRUD smoke tests for simple REST APIs.
+Analyze frontend API usage, compare it with backend contracts, and optionally run transaction-style live API tests with best-effort cleanup.
 
-**⚠️ Beta (v1.1.0)**
-- Dev/staging only
-- Simple JSON REST APIs only
-- DELETE-based cleanup only
-- Side effects are not reverted
+**⚠️ Beta (v1.2.0)**
+- Audit mode is the default and safest mode
+- Live mode is opt-in
+- Dev/staging only for write tests
+- Cleanup is best-effort, not true rollback
+- Side effects may remain after live tests
 
-See [README.md](README.md) for maturity assessment and [LIMITATIONS.md](references/LIMITATIONS.md) for full constraints.
+See [README.md](README.md) for maturity notes and [LIMITATIONS.md](references/LIMITATIONS.md) for operational constraints.
 
 ## Overview
 
-This skill generates automated CRUD smoke tests from a configuration file. Users define API endpoints and parameters, and the skill creates Python test scripts with basic rollback.
-
-**What it does well:**
-- Quick CRUD smoke tests for simple REST APIs
-- Config-driven test generation
-- Basic resource cleanup (DELETE-based)
-- Fast iteration for new endpoints
-
-**What it does NOT do:**
-- Complex test scenarios (use manual testing)
-- Production-safe operations (dev/staging only)
-- Side-effect rollback (notifications, points, webhooks remain)
-- Comprehensive validation (generated tests focus on status, ID presence, and basic flow completion)
-
-**⚠️ Read [LIMITATIONS.md](references/LIMITATIONS.md) before use!**
-
-## Quick Start
-
-### 1. Create Configuration File
-
-Create `my-service-config.json`:
-
-```json
-{
-  "service": {
-    "name": "My Service",
-    "api_base": "https://api.example.com",
-    "auth": {
-      "method": "header",
-      "token_key": "Authorization",
-      "token_prefix": "Bearer"
-    }
-  },
-  "test_account": {
-    "email": "test@example.com",
-    "password": "password123"
-  },
-  "features": {
-    "posts": {
-      "name": "Blog Posts",
-      "create": {
-        "endpoint": "/posts",
-        "method": "POST",
-        "params": {
-          "required": ["title", "content"],
-          "optional": ["tags", "published"]
-        },
-        "id_field": "id"
-      },
-      "read": {
-        "endpoint": "/posts",
-        "method": "GET"
-      },
-      "update": {
-        "endpoint": "/posts/{id}",
-        "method": "PUT",
-        "params": {
-          "required": ["title", "content"]
-        }
-      },
-      "delete": {
-        "endpoint": "/posts/{id}",
-        "method": "DELETE"
-      }
-    }
-  }
-}
-```
-
-### 2. Generate Tests
-
-```bash
-python3 scripts/generate_tests.py --config my-service-config.json
-```
-
-This creates:
-- `test_posts_crud.py` - Full CRUD test suite
-- `test_posts_create_delete.py` - Minimal Create→Delete transaction test
-
-### 3. Run Tests
-
-```bash
-python3 test_posts_crud.py
-```
-
-Output:
-```
-======================================================================
-🧪 CRUD Test: Blog Posts
-======================================================================
-
-[CREATE] Creating resource...
-  ✅ CREATE success (ID: 123)
-
-[READ] Reading resource...
-  ✅ READ success
-
-[UPDATE] Updating resource...
-  ✅ UPDATE success
-
-[DELETE] Deleting resource (rollback)...
-  ✅ DELETE success
-
-======================================================================
-🎉 Test Complete: 4/4 passed (100%)
-======================================================================
-```
-
-## Configuration Guide
-
-See [CONFIG.md](references/CONFIG.md) for complete configuration options.
-
-### Minimal Configuration
-
-```json
-{
-  "service": {
-    "api_base": "https://api.example.com"
-  },
-  "features": {
-    "users": {
-      "create": {"endpoint": "/users"},
-      "delete": {"endpoint": "/users/{id}"}
-    }
-  }
-}
-```
-
-### Authentication Methods
-
-**Header-based (default):**
-```json
-{
-  "auth": {
-    "method": "header",
-    "token_key": "Authorization",
-    "token_prefix": "Bearer"
-  }
-}
-```
-
-**Cookie-based:**
-```json
-{
-  "auth": {
-    "method": "cookie",
-    "cookie_name": "session"
-  }
-}
-```
-
-**Custom headers:**
-```json
-{
-  "auth": {
-    "method": "custom",
-    "headers": {
-      "x-access-token": "{token}",
-      "x-access-id": "{user_id}"
-    }
-  }
-}
-```
-
-## Test Patterns
-
-### Pattern 1: Create → Delete (Minimal)
-
-Tests only resource creation and cleanup:
-
-```python
-def test_create_delete():
-    resource_id = None
-    try:
-        # CREATE
-        resource_id = create_resource()
-        assert resource_id is not None
-    finally:
-        # ROLLBACK
-        if resource_id:
-            delete_resource(resource_id)
-```
-
-**When to use:** Quick smoke test, rollback verification
-
-### Pattern 2: Full CRUD
-
-Tests basic CRUD flow with rollback:
-
-```python
-def test_full_crud():
-    resource_id = None
-    try:
-        # CREATE
-        resource_id = create_resource()
-
-        # READ
-        data = read_resource(resource_id)
-        assert data is not None
-
-        # UPDATE
-        update_resource(resource_id, {'title': 'Updated'})
-
-        # READ (verify resource is still accessible)
-        data = read_resource(resource_id)
-        assert data is not None
-    finally:
-        # DELETE (rollback)
-        if resource_id:
-            delete_resource(resource_id)
-```
-
-**When to use:** Basic CRUD smoke verification
-
-### Pattern 3: Manual Edge Case Tests (Not Generated by Default)
-
-Example of custom error-case testing you can add manually:
-
-```python
-def test_edge_cases():
-    # Missing required field
-    result = create_resource(title="", content="test")
-    assert result['error'] == 'title_required'
-
-    # Invalid ID
-    result = read_resource("invalid-id")
-    assert result['status'] == 404
-```
-
-**When to use:** Manual extension for service-specific validation
-
-## Advanced Usage
-
-### Custom Validation
-
-Add custom validation functions to generated tests:
-
-```python
-def custom_validator(response):
-    """Add your own validation logic"""
-    assert response['status'] == 'published'
-    assert len(response['tags']) > 0
-    return True
-```
-
-### Multiple Environments
-
-Use different configs for different environments:
-
-```bash
-# Development
-python3 scripts/generate_tests.py --config dev-config.json
-
-# Staging
-python3 scripts/generate_tests.py --config staging-config.json
-
-# Production (read-only tests)
-python3 scripts/generate_tests.py --config prod-config.json --read-only
-```
-
-### Batch Testing
-
-Test multiple features at once:
-
-```bash
-python3 scripts/run_all_tests.py --config my-config.json
-```
-
-## Generated Files
-
-The skill generates these files:
-
-```
-test_<feature>_crud.py          # Full CRUD test
-test_<feature>_create_delete.py # Minimal transaction test
-test_results_<timestamp>.json   # Test results
-test_report_<timestamp>.html    # Visual report
-```
-
-## Workflow
-
-See [WORKFLOW.md](references/WORKFLOW.md) for detailed step-by-step guides:
-- API analysis workflow
-- Test generation workflow
-- Debugging failed tests
-- Report generation
-
-## Troubleshooting
-
-**Tests fail with authentication error:**
-- Verify auth configuration in config file
-- Check token/cookie validity
-- Test login endpoint manually
-
-**Rollback not working:**
-- Verify delete endpoint configuration
-- Check id_field extraction path
-- Ensure delete endpoint accepts the correct ID format
-
-**Generated tests don't match API:**
-- Re-analyze API with [API-ANALYSIS.md](references/API-ANALYSIS.md)
-- Update config file with correct parameters
-- Regenerate tests
-
-## Examples
-
-See [EXAMPLES.md](references/EXAMPLES.md) for real-world examples:
-- E-commerce API (products, orders, reviews)
-- Social media API (posts, comments, likes)
-- SaaS API (users, projects, tasks)
-- Golf app API (joins, communities, profiles)
-
-## Scripts Reference
-
-- `generate_tests.py` - Generate test files from config
-- `run_all_tests.py` - Execute all generated tests
-- `report_generator.py` - Create visual test reports
-- `validate_config.py` - Validate configuration file
-
-## Best Practices
-
-1. **Start small** - Test Create→Delete first, then add Read/Update
-2. **Always rollback** - Never leave test data in production
-3. **Use descriptive names** - Name features clearly in config
-4. **Version control config** - Track changes to test configurations
-5. **Separate environments** - Use different configs for dev/staging/prod
-
-## Limitations
-
-**Supported:**
-- REST APIs with JSON responses only
-- Synchronous CRUD operations
-- Simple header/cookie authentication
-- Single resource operations
-
-**NOT Supported:**
-- GraphQL, WebSocket, gRPC
-- OAuth flows (manual token required)
-- Batch operations
-- File uploads
-- Nested resource creation
-- Async/job-based operations
-
-**Rollback limitations:**
-- Only deletes the resource record
-- Does NOT revert: emails, notifications, points, webhooks, logs
-- May fail on soft-delete or dependent resources
-
-**Test quality:**
-- Generated tests validate status codes, ID presence, and basic CRUD flow completion
-- No schema validation
-- No strong field equality guarantees by default
-- No permission/auth boundary testing
-
-**See [LIMITATIONS.md](references/LIMITATIONS.md) for complete details.**
-
-## See Also
-
-- [CONFIG.md](references/CONFIG.md) - Complete configuration reference
-- [WORKFLOW.md](references/WORKFLOW.md) - Step-by-step guides
-- [API-ANALYSIS.md](references/API-ANALYSIS.md) - How to analyze APIs
-- [EXAMPLES.md](references/EXAMPLES.md) - Real-world examples
+This skill is designed to verify whether frontend request flows are actually compatible with backend API contracts.
+
+It works in two layers:
+
+### 1. Audit mode (default)
+- Analyze frontend API calls from web, mobile, or admin code
+- Extract request method, path, headers, query, body shape, and response field usage
+- Compare them against backend controllers, DTOs, auth requirements, and response structures
+- Produce mismatch notes and validation reports
+
+### 2. Live mode (optional)
+- Execute selected API scenarios against a real environment
+- Validate request/response behavior with real data
+- Run transaction-style test flows when configured
+- Attempt best-effort cleanup after test execution
+
+## What it does well
+
+- Analyze frontend API usage patterns
+- Compare frontend expectations with backend endpoint contracts
+- Detect method/path/payload/auth/response mismatches
+- Help audit regressions across web/mobile/admin surfaces
+- Optionally run controlled live API checks in dev/staging
+- Attempt cleanup-oriented validation flows after write tests
+
+## What it does NOT do
+
+- Guaranteed rollback across side effects
+- Production-safe write testing
+- Full browser/app UI automation
+- Comprehensive QA replacement
+- Fully automatic support for arbitrary APIs without configuration
+
+## Modes
+
+### Audit mode
+Default mode.
+
+Use this mode when you want static analysis only:
+- no real write requests
+- no live data mutation
+- contract mismatch reporting only
+
+### Live read-only mode
+Optional.
+
+Use this mode when you want to verify safe request/response behavior against a real environment without write operations.
+
+### Live write mode
+Optional.
+
+Use this mode when you want create/update/delete validation with best-effort cleanup.
+Use only in isolated dev/staging environments.
+
+## Typical workflow
+
+1. Inspect frontend API call sites
+2. Extract request method, path, auth, query, and payload usage
+3. Inspect backend controller mappings and DTO contracts
+4. Compare frontend expectations against backend definitions
+5. Summarize mismatches and likely breakpoints
+6. Optionally run live verification scenarios
+7. Attempt best-effort cleanup for write scenarios
+
+## Suggested outputs
+
+This skill may produce:
+- frontend-backend contract audit reports
+- endpoint mismatch summaries
+- auth/DTO/response compatibility notes
+- optional live transaction-style test results
+- cleanup result summaries
+
+## When to use
+
+Use this skill when:
+- frontend and backend evolve separately
+- you want to catch request/response contract mismatches early
+- you want optional real-data verification in dev/staging
+- you need regression auditing across multiple frontend surfaces
+
+## Safety rules
+
+- Default to audit mode unless live testing is explicitly appropriate
+- Treat live write tests as opt-in only
+- Never assume cleanup is equivalent to DB transaction rollback
+- Warn clearly when side effects may survive cleanup
+- Do not position live mode as production-safe
+
+## References
+
+Read these when needed:
+- [CONFIG.md](references/CONFIG.md) for configuration direction
+- [LIMITATIONS.md](references/LIMITATIONS.md) for scope and safety limits
+- [EXAMPLES.md](references/EXAMPLES.md) for example scenarios
