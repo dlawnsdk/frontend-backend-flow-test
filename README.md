@@ -59,10 +59,11 @@
 **Current validation:**
 - HTTP status codes
 - Resource ID presence
+- Basic CRUD flow completion
 
 **Missing validation:**
 - Response schema
-- Field value correctness
+- Strong field value correctness guarantees
 - Timestamp validation
 - Relationship integrity
 - Permission boundaries
@@ -167,7 +168,7 @@
 
 ## 📝 Current Version Assessment
 
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Status:** Beta / Early Release  
 **Maturity:** 6.5/10
 
@@ -183,7 +184,7 @@
 - Edge cases not handled
 - Rollback limitations not obvious enough
 
-**Recommended next steps before 1.1.0:**
+**Recommended next steps before 1.2.0:**
 1. Wire --dry-run and --read-only flags
 2. Add config schema validator
 3. Improve generated test assertions
