@@ -134,8 +134,9 @@ class {class_name}Test:
         
         try:
             endpoint = "{delete_endpoint}".format(id=self.resource_id)
-            payload = {{{delete_id_param}}}
+            payload = {delete_payload_base}
             {delete_user_binding}
+            {delete_resource_id_binding}
 
             if "{delete_request_encoding}" == "json":
                 r = requests.{http_delete_method}(
@@ -239,9 +240,7 @@ UPDATE_METHOD_TEMPLATE = '''
             endpoint = "{update_endpoint}".format(id=self.resource_id)
             data = {update_data}
             {update_user_binding}
-            data.update({{
-                {update_id_param}
-            }})
+            {update_resource_id_binding}
 
             if "{update_request_encoding}" == "json":
                 r = requests.{http_method}(
@@ -317,7 +316,13 @@ def build_user_binding(include_user_id, field_name='userId', target='data'):
     return ""
 
 
-def generate_test(config, feature_key, feature_config, output_dir):
+def build_resource_id_binding(include_resource_id, field_name, target='data'):
+    if include_resource_id:
+        return f"{target}['{field_name}'] = self.resource_id"
+    return ""
+
+
+def generate_test(config, feature_key, feature_config, output_dir, read_only=False):
     """Generate test file for a feature"""
     
     service_name = config['service']['name']
@@ -390,26 +395,27 @@ def generate_test(config, feature_key, feature_config, output_dir):
     # UPDATE
     update_method_code = ""
     update_test = ""
-    if 'update' in feature_config:
+    if 'update' in feature_config and not read_only:
         update_config = feature_config['update']
         update_endpoint = update_config.get('endpoint', f'/{feature_key}/{{id}}')
         update_method = update_config.get('method', 'PUT')
         update_request_encoding = update_config.get('request_encoding', 'data')
         update_include_user_id = update_config.get('include_user_id', False)
         update_user_id_field = update_config.get('user_id_field', 'userId')
-        update_data = test_data.copy()
-        update_data['content'] = f'[AutoTest] Updated {feature_name}'
+        update_include_resource_id = update_config.get('include_resource_id', False)
+        update_resource_id_field = update_config.get('resource_id_field', f'{feature_key}_id')
+        update_data = update_config.get('test_data', test_data.copy())
+        if 'content' in update_data:
+            update_data['content'] = f'[AutoTest] Updated {feature_name}'
 
-        update_id_param = f"'{feature_key}_id': self.resource_id"
-        
         update_method_code = UPDATE_METHOD_TEMPLATE.format(
             feature_name=feature_name,
             update_endpoint=update_endpoint,
             update_request_encoding=update_request_encoding,
             update_user_binding=build_user_binding(update_include_user_id, update_user_id_field),
+            update_resource_id_binding=build_resource_id_binding(update_include_resource_id, update_resource_id_field),
             http_method=update_method.lower(),
-            update_data=json.dumps(update_data),
-            update_id_param=update_id_param
+            update_data=json.dumps(update_data)
         )
         update_test = '''
             # UPDATE
@@ -425,9 +431,15 @@ def generate_test(config, feature_key, feature_config, output_dir):
     delete_request_encoding = delete_config.get('request_encoding', 'data')
     delete_include_user_id = delete_config.get('include_user_id', False)
     delete_user_id_field = delete_config.get('user_id_field', 'userId')
-    delete_id_param = f"'{feature_key}_id': self.resource_id"
+    delete_include_resource_id = delete_config.get('include_resource_id', False)
+    delete_resource_id_field = delete_config.get('resource_id_field', f'{feature_key}_id')
     
     test_sequence = read_test + update_test
+
+    if read_only:
+        create_method = 'GET'
+        create_endpoint = feature_config.get('read', {}).get('detail_endpoint') or feature_config.get('read', {}).get('endpoint', create_endpoint)
+        test_sequence = ''
     
     # Generate final code
     code = TEST_TEMPLATE.format(
@@ -447,16 +459,17 @@ def generate_test(config, feature_key, feature_config, output_dir):
         http_create_method=create_method.lower(),
         create_endpoint=create_endpoint,
         create_request_encoding=create_request_encoding,
-        create_user_binding=build_user_binding(create_include_user_id, create_user_id_field),
-        create_data=json.dumps(test_data),
+        create_user_binding=build_user_binding(create_include_user_id and not read_only, create_user_id_field),
+        create_data=json.dumps(test_data if not read_only else {}),
         id_extraction=id_extraction,
         read_method=read_method_code,
         update_method=update_method_code,
         delete_endpoint=delete_endpoint,
         delete_request_encoding=delete_request_encoding,
-        delete_user_binding=build_user_binding(delete_include_user_id, delete_user_id_field, 'payload'),
+        delete_payload_base='{}',
+        delete_user_binding=build_user_binding(delete_include_user_id and not read_only, delete_user_id_field, 'payload'),
+        delete_resource_id_binding=build_resource_id_binding(delete_include_resource_id and not read_only, delete_resource_id_field, 'payload'),
         http_delete_method=delete_method.lower(),
-        delete_id_param=delete_id_param,
         test_sequence=test_sequence
     )
     
@@ -472,8 +485,8 @@ def main():
     parser = argparse.ArgumentParser(description='Generate flow-oriented live API tests from configuration')
     parser.add_argument('--config', required=True, help='Configuration file path')
     parser.add_argument('--output', default='.', help='Output directory')
-    parser.add_argument('--dry-run', action='store_true', help='Generate tests without write operations')
-    parser.add_argument('--read-only', action='store_true', help='Generate read-only tests (no create/update/delete)')
+    parser.add_argument('--dry-run', action='store_true', help='Generate files only; do not execute network calls during generation')
+    parser.add_argument('--read-only', action='store_true', help='Generate read-focused tests without update/delete write flow')
     
     args = parser.parse_args()
     
@@ -527,7 +540,7 @@ def main():
     
     generated_files = []
     for feature_key, feature_config in config['features'].items():
-        test_file = generate_test(config, feature_key, feature_config, output_dir)
+        test_file = generate_test(config, feature_key, feature_config, output_dir, read_only=args.read_only)
         generated_files.append(test_file)
     
     print()
