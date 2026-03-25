@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Complete guide to configuration file options.
+Configuration guide for `frontend-backend-flow-test`.
 
 ## Table of Contents
 
@@ -8,7 +8,8 @@ Complete guide to configuration file options.
 - [Authentication](#authentication)
 - [Test Account](#test-account)
 - [Features](#features)
-- [Response Handling](#response-handling)
+- [Operation Options](#operation-options)
+- [Modes](#modes)
 - [Examples](#examples)
 
 ---
@@ -21,7 +22,8 @@ Complete guide to configuration file options.
     "name": "My Service",
     "api_base": "https://api.example.com",
     "timeout": 30,
-    "retry": 3
+    "retry": 3,
+    "environment": "staging"
   }
 }
 ```
@@ -29,8 +31,9 @@ Complete guide to configuration file options.
 **Fields:**
 - `name` (string, required): Service display name
 - `api_base` (string, required): Base URL for all API calls
-- `timeout` (integer, optional): Request timeout in seconds (default: 10)
-- `retry` (integer, optional): Number of retries on failure (default: 0)
+- `timeout` (integer, optional): Reserved for future request timeout handling
+- `retry` (integer, optional): Reserved for future retry handling
+- `environment` (string, optional): Helpful label for safety messaging (`local`, `dev`, `staging`, etc.)
 
 ---
 
@@ -43,17 +46,10 @@ Complete guide to configuration file options.
   "auth": {
     "method": "header",
     "token_key": "Authorization",
-    "token_prefix": "Bearer",
-    "user_id_key": "x-user-id"
+    "token_prefix": "Bearer"
   }
 }
 ```
-
-**Fields:**
-- `method`: "header"
-- `token_key`: Header key for token (default: "Authorization")
-- `token_prefix`: Prefix for token value (default: "Bearer")
-- `user_id_key`: Optional header for user ID
 
 ### Cookie-Based
 
@@ -102,35 +98,32 @@ Use `{token}` and `{user_id}` placeholders.
     "email": "test@example.com",
     "password": "password123",
     "login_endpoint": "/auth/login",
-    "token_path": "data.token",
+    "request_encoding": "json",
+    "token_path": "data.accessToken",
     "user_id_path": "data.user.id"
   }
 }
 ```
 
 **Fields:**
-- `email` (string, required): Test account email
-- `password` (string, required): Test account password
-- `login_endpoint` (string, optional): Login API endpoint (default: "/login")
-- `token_path` (string, optional): JSON path to extract token (default: "token")
-- `user_id_path` (string, optional): JSON path to extract user ID (default: "user_id")
-
-**JSON Path Examples:**
-- `"token"` → `response['token']`
-- `"data.token"` → `response['data']['token']`
-- `"auth.access_token"` → `response['auth']['access_token']`
+- `email` (string, required)
+- `password` (string, required)
+- `login_endpoint` (string, optional, default: `/login`)
+- `request_encoding` (string, optional): `json`, `data`, or `params`
+- `token_path` (string, optional): JSON path to extract token
+- `user_id_path` (string, optional): JSON path to extract user ID
 
 ---
 
 ## Features
 
-Each feature represents a resource type (e.g., posts, users, products).
+Each feature represents one frontend-backend flow surface.
 
 ```json
 {
   "features": {
-    "posts": {
-      "name": "Blog Posts",
+    "faq": {
+      "name": "Admin FAQ",
       "create": { ... },
       "read": { ... },
       "update": { ... },
@@ -140,173 +133,102 @@ Each feature represents a resource type (e.g., posts, users, products).
 }
 ```
 
-### CREATE Operation
+### CREATE
 
 ```json
 {
   "create": {
-    "endpoint": "/posts",
+    "endpoint": "/admin/faqs",
     "method": "POST",
-    "params": {
-      "required": ["title", "content"],
-      "optional": ["tags", "published"]
-    },
-    "id_field": "id",
+    "request_encoding": "json",
+    "include_user_id": false,
+    "id_field": "data.seq",
     "test_data": {
-      "title": "[AutoTest] Test Post",
-      "content": "This is a test post"
+      "question": "[AutoTest] FAQ question",
+      "answer": "Auto-generated answer"
     }
   }
 }
 ```
 
-**Fields:**
-- `endpoint` (string, required): API endpoint
-- `method` (string, optional): HTTP method (default: "POST")
-- `params.required` (array, required): Required parameters
-- `params.optional` (array, optional): Optional parameters
-- `id_field` (string, required): JSON path to extract resource ID
-- `test_data` (object, optional): Default test data
-
-### READ Operation
+### READ
 
 ```json
 {
   "read": {
-    "endpoint": "/posts",
-    "method": "GET",
-    "detail_endpoint": "/posts/{id}",
+    "endpoint": "/admin/faqs",
+    "detail_endpoint": "/admin/faqs/{id}",
     "list_path": "data.items"
   }
 }
 ```
 
-**Fields:**
-- `endpoint` (string, required): List endpoint
-- `method` (string, optional): HTTP method (default: "GET")
-- `detail_endpoint` (string, optional): Single resource endpoint (use `{id}`)
-- `list_path` (string, optional): JSON path to extract list (default: root array)
-
-### UPDATE Operation
+### UPDATE
 
 ```json
 {
   "update": {
-    "endpoint": "/posts/{id}",
+    "endpoint": "/admin/faqs/{id}",
     "method": "PUT",
-    "params": {
-      "required": ["title"],
-      "optional": ["content", "tags"]
+    "request_encoding": "json",
+    "include_user_id": false,
+    "include_resource_id": false,
+    "resource_id_field": "faqSeq",
+    "test_data": {
+      "question": "[AutoTest] Updated FAQ question",
+      "answer": "Updated answer"
     }
   }
 }
 ```
 
-**Fields:**
-- `endpoint` (string, required): Update endpoint (use `{id}`)
-- `method` (string, optional): HTTP method (default: "PUT")
-- `params`: Same as CREATE
-
-### DELETE Operation
+### DELETE
 
 ```json
 {
   "delete": {
-    "endpoint": "/posts/{id}",
-    "method": "DELETE"
+    "endpoint": "/admin/faqs/{id}",
+    "method": "DELETE",
+    "request_encoding": "data",
+    "include_user_id": false,
+    "include_resource_id": false,
+    "resource_id_field": "faqSeq"
   }
 }
 ```
-
-**Fields:**
-- `endpoint` (string, required): Delete endpoint (use `{id}`)
-- `method` (string, optional): HTTP method (default: "DELETE")
 
 ---
 
-## Response Handling
+## Operation Options
 
-```json
-{
-  "response": {
-    "format": "json",
-    "success_codes": [200, 201],
-    "success_field": "ok",
-    "error_field": "error"
-  }
-}
-```
+Supported per operation where relevant:
 
-**Fields:**
-- `format` (string, optional): Response format (default: "json")
-- `success_codes` (array, optional): HTTP codes for success (default: [200, 201])
-- `success_field` (string, optional): Field to check for success (e.g., "ok")
-- `error_field` (string, optional): Field containing error message
+- `endpoint`: request path
+- `method`: HTTP method
+- `request_encoding`: `json`, `data`, or `params`
+- `include_user_id`: whether to inject authenticated user id into payload
+- `user_id_field`: field name used when `include_user_id` is true
+- `include_resource_id`: whether to inject current resource id into payload
+- `resource_id_field`: field name used when `include_resource_id` is true
+- `id_field`: JSON path to extract created resource id
+- `test_data`: payload body for that operation
 
 ---
 
-## Complete Example
+## Modes
 
-```json
-{
-  "service": {
-    "name": "Greenlight Golf",
-    "api_base": "http://3.34.82.231:3560",
-    "timeout": 15
-  },
-  
-  "auth": {
-    "method": "custom",
-    "headers": {
-      "x-access-token": "{token}",
-      "x-access-id": "{user_id}"
-    }
-  },
-  
-  "test_account": {
-    "email": "test@example.com",
-    "password": "test1234",
-    "login_endpoint": "/login",
-    "token_path": "auth_token",
-    "user_id_path": "id"
-  },
-  
-  "features": {
-    "community": {
-      "name": "Community Posts",
-      "create": {
-        "endpoint": "/auth/community/post/basic",
-        "params": {
-          "required": ["userId", "content", "category"],
-          "optional": ["media"]
-        },
-        "id_field": "data",
-        "test_data": {
-          "content": "[AutoTest] Test post",
-          "category": "free"
-        }
-      },
-      "read": {
-        "endpoint": "/auth/community/list",
-        "detail_endpoint": "/auth/community/detail",
-        "list_path": "data.list"
-      },
-      "update": {
-        "endpoint": "/auth/community/post/update",
-        "params": {
-          "required": ["userId", "community_id", "content"]
-        }
-      },
-      "delete": {
-        "endpoint": "/auth/community/post/delete",
-        "method": "POST"
-      }
-    }
-  },
-  
-  "response": {
-    "success_field": "ok",
-    "error_field": "message"
-  }
-}
-```
+### Default generation
+Generates live flow-oriented test files for configured create/read/update/delete operations.
+
+### `--read-only`
+Generates read-focused tests without update/delete write flow.
+Use for safer smoke validation when mutation is not desired.
+
+### `--dry-run`
+Currently means generation-only at generator time. It does **not** automatically add runtime network blocking to generated scripts.
+
+---
+
+## Examples
+
+See [EXAMPLES.md](EXAMPLES.md) for sample configurations.

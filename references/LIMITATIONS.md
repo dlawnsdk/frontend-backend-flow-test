@@ -11,7 +11,8 @@
 **API Style:**
 - REST APIs with JSON responses
 - Synchronous operations only
-- Simple CRUD operations
+- Simple flow-oriented API validation
+- Basic create/read/update/delete live checks when configuration is explicit
 
 **Authentication:**
 - Header-based (Bearer, custom headers)
@@ -215,7 +216,7 @@ Deleting User fails if Posts exist.
 **Currently:**
 - ✅ HTTP status codes (200, 201, 404)
 - ✅ Resource ID presence
-- ✅ Basic CRUD flow completion
+- ✅ Basic flow completion
 
 **NOT validated (yet):**
 - ❌ Response schema correctness
@@ -245,7 +246,7 @@ assert response['author']['id'] == user_id
 
 ### ✅ Good Fit
 
-- **Smoke testing** - Verify basic CRUD works
+- **Smoke testing** - Verify basic request flow works
 - **Regression testing** - Ensure endpoints remain functional
 - **Quick validation** - Test new API endpoints
 - **Local development** - Rapid iteration testing
@@ -295,7 +296,7 @@ Planned features to address limitations:
 ## 📝 Summary
 
 **Use this skill when:**
-- You need quick CRUD smoke tests
+- You need quick frontend-backend flow smoke tests
 - Your API is simple REST + JSON
 - You have a clean test environment
 - You understand rollback limitations
